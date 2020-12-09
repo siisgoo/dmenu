@@ -55,8 +55,9 @@ static Clr *scheme[SchemeLast];
 
 #include "config.h"
 
-static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
-static char *(*fstrstr)(const char *, const char *) = strstr;
+static char * cistrstr(const char *s, const char *sub);
+static int (*fstrncmp)(const char *, const char *, size_t) = strncasecmp;
+static char *(*fstrstr)(const char *, const char *) = cistrstr;
 
 static void
 appenditem(struct item *item, struct item **list, struct item **last)
@@ -551,8 +552,19 @@ static void
 run(void)
 {
 	XEvent ev;
+	int i;
 
 	while (!XNextEvent(dpy, &ev)) {
+		if (preselected) {
+			for (i = 0; i < preselected; i++) {
+				if (sel && sel->right && (sel = sel->right) == next) {
+					curr = next;
+					calcoffsets();
+				}
+			}
+			drawmenu();
+			preselected = 0;
+		}
 		if (XFilterEvent(&ev, win))
 			continue;
 		switch(ev.type) {
@@ -690,7 +702,7 @@ static void
 usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid] [-n number]\n", stderr);
 	exit(1);
 }
 
@@ -709,9 +721,9 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
 			fast = 1;
-		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
-			fstrncmp = strncasecmp;
-			fstrstr = cistrstr;
+		else if (!strcmp(argv[i], "-s")) { /* case-sensitive item matching */
+			fstrncmp = strncmp;
+			fstrstr = strstr;
 		} else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
@@ -733,6 +745,8 @@ main(int argc, char *argv[])
 			colors[SchemeSel][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];
+		else if (!strcmp(argv[i], "-n"))   /* preselected item */
+			preselected = atoi(argv[++i]);
 		else
 			usage();
 
